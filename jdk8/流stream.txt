@@ -1,0 +1,252 @@
+流Stream
+概述
+
+Stream可以说是java8的一大亮点。java8中的Stream对集合功能进行了增强。在日常开发中，我们免不了要经常对集合对象进行处理，
+而在java8以前，对于集合的处理完全是由我们自己来操作，所以代码看起来相对繁杂。而有了Stream以后，对于集合的处理得到了大大的简化。
+Stream提供了对集合对象的各种非常便利的、高效的聚合操作。
+集合和Stream，表面看起来很相似，却有着不同的目标。集合关注的是它当中元素元素有效的管理和访问。与集合不同，流不会对它当中的
+元素提供一种直接访问的方式，它关注的是计算。Stream关注的是它的源source的各种聚合的计算操作。这也是集合和流的本质区别。
+
+流操作的运行原理
+
+一般来说Stream可分为三个部分：源source、中间操作Intermediate和终止操作Terminal。
+流的源可以是一个数组、一个集合、一个生成器方法，一个I/O通道等等。
+一个流可以有零个和或者多个中间操作，每一个中间操作都会返回一个新的流，供下一个操作使用一个流只会有一个终止操作。
+中间操作都是惰性的，也就是说仅仅调用流的中间操作，其实并没有真正开始流的源的遍历。
+一个流只能有一个终止操作，它必定是流的最后一个操作。只有调用了流的终止操作，流的源的元素才会真正的开始遍历，并且会生成一个结果返回或者产生一个副作用（side-effect）。
+另外，每一个流只能被使用一次（即调用中间操作或者终止操作）。如果检测到流被重用，会抛出IllegalStateException异常。所以才使用流的时候，建议采用链式的写法，如下：
+List<Integer> list = Arrays.asList(1, 2, 3, 4, 5, 6);
+int sum = list.stream().map(item -> item * 2).reduce(0, Integer::sum)
+从表面上来看，好像流在执行了多个中间操作和一个终止操作之后，对于每一个操作，流中的元素都会遍历执行，也就是有几个操作，
+流中的元素就会进行几次遍历。这种观点是大错特错的。
+流的实际执行流程是这样的，在遇到中间操作的时候，其实只是构建了一个Pipeline对象，而该对象是一个双向链表的数据结构，
+只有在遇到终止操作的时候，那些中间操作和终止操作会被封装成链表的数据结构链接起来，而流中每一个元素只会按照顺序链接的去执行这些操作，
+也就是说，流中的元素最终只会在遇到终止操作后遍历一次，而每个元素会将所有操作按顺序执行一遍。
+
+Stream的常用API
+
+1. map/flatMap 映射
+map操作是讲流中的元素映射成另外一种元素，接受一个Function类型的参数，是一个中间操作。例子：
+// 转换大写
+List<String> output = wordList.stream().map(String::toUpperCase).collect(Collectors.toList());
+// 求平方
+List<Integer> nums = Arrays.asList(1, 2, 3, 4);
+List<Integer> squareNums = nums.stream().map(n -> n * n).collect(Collectors.toList());
+
+flatMap是一种打平的映射。可用于一堆多的操作。也是一个中间操作例子：
+Stream<List<Integer>> inputStream = Stream.of(Arrays.asList(1),Arrays.asList(2, 3), Arrays.asList(4, 5, 6));
+Stream<Integer> outputStream = inputStream.FlatMap((childList) -> childList.stream());
+看到最后返回的是Stream<Integer>类型，原来Stream<List<Integer>>中的集合元素被打平了。
+
+2. filter 过滤
+filter是对流中的元素进行过滤操作，会接受一个Predicate类型的参数，是一个中间操作。只要是不满足这个predicate的，
+也就是说predicate.test()返回false的元素会被过滤掉。例子：
+// 找出偶数
+Integer[] sixNums = {1, 2, 3, 4, 5, 6};
+Integer[] evens = Stream.of(sixNums).filter(n -> n%2 == 0).toArray(Integer[]::new);
+
+3. distinct 去重
+distinct操作是对流中的元素进行去重，是一个中间操作。
+
+4. sorted 排序
+sorted操作是对流中的元素按照进行排序，是一个中间操作。不带参数的是按照自然顺序进行排序。带参数的会传一个Comparator类型的参数，作为比较规则。
+
+5. limit
+limit获取流中前n个元素返回。是一个中间操作。另外这个是一个短路操作（short-circuiting）。也就是说流中的元素遍历到了第n个过后，后面的元素就不在进行遍历了。可以看一个例子：
+public void testLimitAndSkip() {
+    List<Person> persons = new ArrayList();
+    for (int i = 1; i <= 10000; i++) {
+        Person person = new Person(i, "name" + i);
+        persons.add(person);
+    }
+    List<String> personList2 = persons.stream()
+        .map(Person::getName)
+        .limit(5)
+        .collect(Collectors.toList());
+}
+最后返回的结果为：name1name2name3name4name5
+
+6. skip
+skip操作是跳过流中的前n个元素。是一个中间操作。
+
+7. forEach
+forEach操作是流中的元素遍历并且执行一个action。这是一个终止操作。
+
+8. toArray
+将流转换为一个数组。是一个终止操作。
+
+9. reduce
+reduce汇聚操作，是一个终止操作。这个方法的主要作用是把 Stream 元素组合起来。它提供一个起始值（种子），然后依照运算规则（BinaryOperator），
+和前面 Stream 的第一个、第二个、第 n 个元素组合。从这个意义上说，字符串拼接、数值的 sum、min、max、average 都是特殊的 reduce。例如 Stream 的 sum 就相当于：
+Integer sum = integers.reduce(0, (a, b) -> a+b); 或者Integer sum = integers.reduce(0, Integer::sum);
+
+10. min、max
+求最大值最小值，是一个终止操作。
+
+11. count
+计算流中元素的个数。是一个终止操作。
+
+12.匹配操作anyMatch、 allMatch、 noneMatch、 findFirst、 findAny
+这些操作都是终止操作，且都是短路操作。
+allMatch：Stream 中全部元素符合传入的 predicate，返回 true，只要有一个不满足就返回false;
+anyMatch：Stream 中只要有一个元素符合传入的 predicate，返回 true。只要有一个满足就返回true；
+noneMatch：Stream 中没有一个元素符合传入的 predicate，返回 true。只要有一个满足就返回false；
+findFirst：找到第一个元素。找到了就直接返回，不在遍历后面元素。
+findAny：找到任何一个元素就会返回。
+
+13. collect 收集
+对流中元素执行一个可变汇聚操作。是一个终止操作。比如：将流中的元素放入到一个List集合当中，将流中的元素进行分组、分区，求和等等操作。
+接受一个收集器Collector对象。Collector收集器下面会详细介绍。下面举几个例子：
+
+// 字符串拼接
+System.out.println(Stream.of("a", "b", "c", "d").collect(Collectors.joining()));
+// 根据task的类型进行分组
+private static Map<TaskType, List<Task>> groupTasksByType(List<Task> tasks) {
+    return tasks.stream().collect(groupingBy(Task::getType));
+}
+
+收集器Collector
+
+概述
+Collector是一接口。通过上面的介绍我们知道Stream的collect方法会接受一个Collector类型的参数，用来进行汇聚操作。那么是怎样实
+现汇聚操作的呢？Collector这个接口又有什么用呢？下面将逐一介绍。
+
+Collector接口
+通过读Jdk的文档可以知道，Collector接口是用来定义一个可变的汇聚操作：将输入元素累加到一个可变结果容器，当所有的输入元素都被处理过后，
+选择性的将累加结果转换为一个最终会的表示。汇聚操作可以被串行和并行的执行。
+
+以下是Collector接口的定义：
+public interface Collector<T, A, R> {
+    /**
+     * 用来创建并且返回一个可变结果容器
+     */
+    Supplier<A> supplier();
+
+    /**
+     * 将一个值叠进一个可变结果容器
+     */
+    BiConsumer<A, T> accumulator();
+
+    /**
+     * 接受两个部分结果并将它们合并。可能是把一个参数叠进另一个参数并且返回另一个参数，
+     * 也有可能返回一个新的结果容器，多线程处理时会用到
+     */
+    BinaryOperator<A> combiner();
+
+    /**
+     * 将中间类型执行最终的转换，转换成最终结果类型
+     * 如果属性 IDENTITY_TRANSFORM 被设置，该方法会假定中间结果类型可以强制转成最终结果
+     * 类型
+     */
+    Function<A, R> finisher();
+
+    /**
+     * 收集器的属性集合
+     */
+    Set<Characteristics> characteristics();
+
+    public static<T, R> Collector<T, R, R> of(Supplier<R> supplier,
+                                              BiConsumer<R, T> accumulator,
+                                              BinaryOperator<R> combiner,
+                                              Characteristics... characteristics) {
+        Objects.requireNonNull(supplier);
+        Objects.requireNonNull(accumulator);
+        Objects.requireNonNull(combiner);
+        Objects.requireNonNull(characteristics);
+        Set<Characteristics> cs = (characteristics.length == 0)
+                                  ? Collectors.CH_ID
+                                  : Collections.unmodifiableSet(EnumSet.of(Collector.Characteristics.IDENTITY_FINISH,
+                                                                           characteristics));
+        return new Collectors.CollectorImpl<>(supplier, accumulator, combiner, cs);
+    }
+
+    public static<T, A, R> Collector<T, A, R> of(Supplier<A> supplier,
+                                                 BiConsumer<A, T> accumulator,
+                                                 BinaryOperator<A> combiner,
+                                                 Function<A, R> finisher,
+                                                 Characteristics... characteristics) {
+        Objects.requireNonNull(supplier);
+        Objects.requireNonNull(accumulator);
+        Objects.requireNonNull(combiner);
+        Objects.requireNonNull(finisher);
+        Objects.requireNonNull(characteristics);
+        Set<Characteristics> cs = Collectors.CH_NOID;
+        if (characteristics.length > 0) {
+            cs = EnumSet.noneOf(Characteristics.class);
+            Collections.addAll(cs, characteristics);
+            cs = Collections.unmodifiableSet(cs);
+        }
+        return new Collectors.CollectorImpl<>(supplier, accumulator, combiner, finisher, cs);
+    }
+
+    enum Characteristics {
+        CONCURRENT,
+        UNORDERED,
+        IDENTITY_FINISH
+    }
+
+可以看到接口中定义了5个抽象方法，各个方法的作用都给出了注释。其实Stream的collect操作就是调用这接口中定义的方法来实现汇聚操作的。
+不同的汇聚操作这些方法需要有不同的实现。
+
+Collectors: Collector的工厂
+Collectors类中只有一个私有的无参构造方法，而且里面提供了大量的静态方法，这些方法最终都是返回一个Collector收集器，
+因此可以认为Collectors这个类是Collector收集器的一个工厂类。Collectors里面定义了一个静态内部类CollectorImpl，该类是Collector收集器的一个实现：
+
+可以看到，它针对Collector中5和方法的返回类型定义了五个对应类型的成员变量，而抽象方法的实现是直接返回这5个成员变量。
+而这五个对象是在构造CollectorImpl的时候传进来的，这些都是函数式接口类型。看源码还可以看到Collectors中的静态方法其实很多
+就是new一个CollectorImpl对象返回，而Collector中抽象方法的实现直接以lambda的形式直接通过CollectorImpl构造方法的参数传过去。
+
+这里有必要对Collector
+Supplier<A> supplier(); BiConsumer<A, T> accumulator(); BinaryOperator<A> combiner(); Function<A, R> finisher();
+这个四个抽象方法结合文档注释还是很好理解的。
+下面以Collectors的toList方法来做一个讲解，以下是toList方法的实现：
+
+可以看到，
+supplier方法的实现为：ArrayList::new，创建一个ArrayList对象并返回。
+accumulator方法的实现为：List::add，将流中的元素添加进上面创建的ArrayList对象。
+combiner方法的实现为：(left, right) -> { left.addAll(right); return left; }，对于两个中间结果容器ArrayList，
+将一个的所有元素添加进另外一个，并返回另外一个ArrayList。
+上面的代码跟进去，发现finisher方法的实现只是将ArrayList用List类型返回。
+而characteristics方法的实现就是返回静态常量CH_ID，它是一个包含了IDENTITY_FINISH的集合，标示中间结果是可以直接向最终结果进行强制类型转换的。
+以上就是toList的汇聚操作。其他的汇聚操作也是类似的，大家可自行分析源码。
+
+Collector的串行和并行实现
+    串行实现：Collector的汇聚操作的串行实现（即单线程）将会使用supplier方法创建唯一的一个结果容器，并且每一个输入元素会调用一次accumulaor方法。
+    并行实现：Collector的汇聚操作的并行实现（即多线程）将会对输入元素进行分区，并且对每一个分区会使用supplier方法创建一个结果容器，
+    然后将各个分区的每一个元素都调用accumulator方法将分区的内容计算出一个子结果，最后通过combiner方法将这些子结果合并成一个最终结果。
+    以上是jdk文档对于Collector串行和并行实现的一个介绍。
+
+Collector的一些约束
+JDK规定，为了确保串行与并行结果的等价性，Collector函数需要满足两个约束条件:identity（同一性）与associativity（结合性）。
+- identity（同一性）约束：对于任何的部分累积结果，跟一个空的结果容器合并将会产生一个等价的结果。也就是说，对于一个任何一
+条分区线上调用accumulator和combiner方法产生的部分结果a，必须等价于combiner.apply(a, supplier.get())；即：a == combiner.
+apply(a, supplier.get());
+- associativity（结合性）约束：进行分割的计算和未分割的计算必须要产生一个等价的结果。也就是说，对于任何的输入元素t1和t2
+，通过串行操作产生的最终结果r1和用过并行计算产生的最终结果r2，必须是等价的。以下是串行和并行计算的代码：
+    A a1 = supplier.get();
+    accumulator.accept(a1, t1);
+    accumulator.accept(a1, t2);
+    R r1 = finisher.apply(a1);  // result without splitting
+    A a2 = supplier.get();
+    accumulator.accept(a2, t1);
+    A a3 = supplier.get();
+    accumulator.accept(a3, t2);
+    R r2 = finisher.apply(combiner.apply(a2, a3));  // result with splitting
+
+JDK还规定，基于Collector实现汇聚操作的库，例如Stream.collect(Collector)，必须满足以下约束：
+    第一个传递给accumulator方法的参数，传递给combiner方法的两个参数以及传递给finisher方法的参数，必须是上一次调用supplier,
+     accumulator, 或者 combiner方法所产生的结果。
+    汇聚操作的实现不应该对supplier， accumulator， 或者combiner产生的结果做任何处理，除了将他们作为参数再一次传递给
+    accumulator， combiner， 或者finisher方法或者作为结果返回给汇聚操作的调用者。
+    如果一个结果被作为参数传递给了combiner或者finisher方法，但是方法的调用并没有返回跟传进来的结果相同的对象，那么这个结
+    果对象再也不会被使用了。传进来的参数没有被返回，说明生成了新的结果对象作为返回对象，所以原来传进来的参数在执行逻辑产
+    生了新的结果对象后就没有用了，不会再被其他地方用到。
+    一旦一个结果被传递给了combiner或者finisher方法，那么它不会再被传递给accumulator方法。也就是说方法执行顺序是不可逆的。
+    收集器方法的执行顺序肯定是这样的：首先用supplier方法产生一个结果容器，然后不断利用accumulator将元素或者其转换过后的结
+    果往结果容器累加，再然后结果容器再被作为参数传递给combiner或者finisher方法。
+    对于非并发的收集器而言，supplier， accumulator， 或者combiner方法产生的结果必须是跟当前线程绑定的。这也使得并行收集
+    无需实现额外的同步操作。汇聚的实现必须要对输入的元素进行划分处理，每一个分区的元素必须被隔离的处理，并且combining必
+    须发生在accumulation完成之后。
+    对于并发的搜集器而言，并发汇聚操作的实现是很自由的（甚至不是必须的）。并发的汇聚操作指的是 accumulator在多个线程上被
+    并发调用时，使用的是同一个并发可修改的（线程安全的）结果容器，而不是在accumulation的时候结果被完全隔离。并发的汇聚操
+    作只有在一个收集器包含Characteristics.UNORDERED属性或者数据本身是无序的时候才能被使用。

@@ -1,0 +1,54 @@
+/*************************35集**************************/
+Stream本身继承于BaseStream,有2个泛型，注意它们为什么要这样继承。
+
+Iterator<T> iterator会返回一个迭代器
+Spliterator<T> spliterator会返回一个分割迭代器
+boolean isParallel判断流是否是并行，必须要在终止操作之前执行，否则可能会引发不可预知的错误
+void close
+S onClose(Runnable closeHandler) 返回流本身并附带一个关闭处理器，当执行close方法时关闭处理器会自动得到调用，
+执行的顺序和他们添加的顺序相同。所有的关闭处理器都会得到执行，当第一个关闭处理器抛出异常时，后面的关闭处理器也会正常的
+执行；当后面的关闭处理器也抛出异常时，会以压制的异常呈现在控制台上，如果和第一个处理器是同一个异常对象，将不会被压制
+（对象不可能压制自身）
+/***************************36集***************************************/
+
+/****************************41集**********************************/
+
+1.ReferencePipeline表示流的源阶段与中间阶段；
+2.ReferencePipeline.Head表示流的源阶段。
+二者在大部分属性的设定上都是类似的，但存在一些属性是不同的，比如说Head是没有
+PreviousStage的，而ReferencePipelin则是存在PreviousStage的，等等。
+
+stream().map().fileter()......
+
+stream().map(i -> 2 * i).filter(i > 10)......
+
+list.stream()返回的stream是根据StreamSupport.stream（）得到的，此方法有2个参数，第一个参数spliterator()会返回IteratorSpliterator对象，
+这个迭代器封装着要操纵的集合数据源，paralle是false代表是串行流，true代表是并行流。
+
+ReferencePipeline这个类是将流的源阶段和流的中间阶段统一进行处理的类，流的很多方法实现其实就是根据ReferencePipeline这个类
+中的方法来实现的。实际返回的流是ReferencePipeline.Head<>是其内部类，此类主要是用来处理流的源阶段，也就是生成的流实际上是
+流的一个源阶段。
+ReferencePipeline<P_IN, P_OUT>中有2个泛型，P_IN表示上个流管道输出的流的类型，P_OUT表示这个流管道将要输出的流的类型。
+
+/**********************************42集***********************************/
+ReferencePipeline.Head<>的构造方法默认会调用AbstractPipeline的构造方法，AbstractPipeline有2个构造方法
+AbstractPipeline(Supplier<? extends Spliterator<?>> source, int sourceFlags, boolean parallel)
+AbstractPipeline(Spliterator<?> source, int sourceFlags, boolean parallel)
+这两个构造方法本质是相同的，sourceSupplier和sourceSpliterator他们是互斥，表示会使用他们中的其中一个来获取分割迭代器，当他们
+使用完之后必须置为空。
+foreach操作存在只针对串行流的终止操作的优化。当流没有中间操作，它会调用ReferencePipeline.Head<>里面的foreach；
+如果调用了任何一个中间操作，就会调用ReferencePipeline的foreach。
+
+/**************************************43集***************************************/
+Arrays.asList方法会返回一个Arrays.ArrayList对象，ArrayList内部实现了spliterator方法，该spliterator方法会返回一个ArraySpliterator<>
+对象。而不是我们通常理解的IteratorSpliterator对象。
+（其它的见流stream2.txt）
+
+/**********************************44集**********************************/
+lambda表达式和匿名内部类本质上不是一回事，虽然他们可以实现相同的功能，见LambdaTest示例，在同一个类中展现出了不同的作用域。
+Sink有二种状态，初始状态和激活状态，每次执行accept的时候，它会执行begin（）方法进入激活状态，执行完accept方法之后，会执行
+end方法进入初始状态，用到了模版方法模式。还可以重复执行，再执行begin、accept、end。
+流的执行本质上就是一个双向链表，每一个操作可以链接到之前的操作。
+同时记住AbstractPipeline的针对初始状态和中间状态的不同构造方法各自的特点及它们的实现。
+
+/***********************************45集****************************************/
